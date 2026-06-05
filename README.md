@@ -21,7 +21,6 @@ L'outil doit permettre de :
 * Vérifier des compatibilités géométriques.
 * Contrôler des dimensions.
 * Réaliser des revues techniques rapides.
-* Préparer des captures destinées à Teams, Outlook, PowerPoint ou tout autre support d'échange.
 
 ---
 
@@ -409,3 +408,182 @@ ou
 | Modifier texte   | `F2`       |
 | Supprimer        | `Suppr`    |
 | Annuler commande | `Échap`    |
+
+Oui, c'est une très bonne idée. Il faut ajouter une section claire dans le README pour expliquer le format de `dataprofils.js`.
+
+Tu peux ajouter cette section après **Données locales** ou après **Informations des profils**.
+
+---
+
+## Créer son fichier `dataprofils.js`
+
+ProfileViewer charge les profils depuis un fichier JavaScript nommé `dataprofils.js`.
+
+Ce fichier doit définir une variable globale :
+
+```js
+window.Profils = [
+  {
+    reference: "DEMO-001",
+    designation: "Profil exemple",
+    largeur: 40,
+    hauteur: 40,
+    surface: 100,
+    poids: 0.5,
+    ixx: 1000,
+    iyy: 1000,
+    paths: "M0 0 H40 V40 H0 Z"
+  }
+];
+````
+
+---
+
+### Champs obligatoires
+
+| Champ         | Type      | Description                             |
+| ------------- | --------- | --------------------------------------- |
+| `reference`   | Texte     | Référence affichée dans la bibliothèque |
+| `designation` | Texte     | Nom ou description du profil            |
+| `largeur`     | Nombre    | Largeur du profil en millimètres        |
+| `hauteur`     | Nombre    | Hauteur du profil en millimètres        |
+| `paths`       | Texte SVG | Tracé SVG du profil                     |
+
+---
+
+### Champs optionnels
+
+| Champ      | Type   | Description                                       |
+| ---------- | ------ | ------------------------------------------------- |
+| `surface`  | Nombre | Surface du profil                                 |
+| `poids`    | Nombre | Poids linéaire                                    |
+| `ixx`      | Nombre | Moment quadratique selon X                        |
+| `iyy`      | Nombre | Moment quadratique selon Y                        |
+| `fillRule` | Texte  | Règle de remplissage SVG, par exemple `"evenodd"` |
+
+---
+
+### Exemple avec plusieurs profils
+
+```js
+window.Profils = [
+  {
+    reference: "L40x40x2",
+    designation: "Cornière 40 x 40 - ép. 2",
+    largeur: 40,
+    hauteur: 40,
+    surface: 156,
+    poids: 0.421,
+    ixx: 20500,
+    iyy: 20500,
+    paths: "M0 0 H40 V2 H2 V40 H0 Z"
+  },
+  {
+    reference: "Tube40x40x2",
+    designation: "Tube carré 40 x 40 - ép. 2",
+    largeur: 40,
+    hauteur: 40,
+    surface: 304,
+    poids: 0.821,
+    ixx: 73300,
+    iyy: 73300,
+    fillRule: "evenodd",
+    paths: "M0 0 H40 V40 H0 Z M2 2 H38 V38 H2 Z"
+  }
+];
+```
+
+---
+
+### À propos du champ `paths`
+
+Le champ `paths` contient le tracé SVG du profil.
+
+Il correspond à la valeur de l'attribut `d` d'un élément SVG `<path>`.
+
+Exemple :
+
+```svg
+<path d="M0 0 H40 V40 H0 Z" />
+```
+
+devient dans `dataprofils.js` :
+
+```js
+paths: "M0 0 H40 V40 H0 Z"
+```
+
+---
+
+### Échelle
+
+Les coordonnées du `paths` doivent être à l'échelle 1:1.
+
+Exemple :
+
+```js
+largeur: 40,
+hauteur: 40,
+paths: "M0 0 H40 V40 H0 Z"
+```
+
+correspond à un profil de 40 mm x 40 mm.
+
+---
+
+### Profils creux
+
+Pour les profils creux, comme les tubes, deux méthodes sont possibles.
+
+#### Méthode recommandée : `fillRule: "evenodd"`
+
+```js
+{
+  reference: "Tube40x40x2",
+  designation: "Tube carré 40 x 40 - ép. 2",
+  largeur: 40,
+  hauteur: 40,
+  fillRule: "evenodd",
+  paths: "M0 0 H40 V40 H0 Z M2 2 H38 V38 H2 Z"
+}
+```
+
+#### Méthode alternative : inverser le sens du contour intérieur
+
+```js
+{
+  reference: "Tube40x40x2",
+  designation: "Tube carré 40 x 40 - ép. 2",
+  largeur: 40,
+  hauteur: 40,
+  paths: "M0 0 H40 V40 H0 Z M2 2 V38 H38 V2 H2 Z"
+}
+```
+
+---
+
+### Conseils
+
+* Utiliser le point `.` comme séparateur décimal.
+* Éviter les virgules dans les nombres.
+* Garder des coordonnées en millimètres.
+* Vérifier que chaque objet est séparé par une virgule.
+* Ne pas oublier le point-virgule final après le tableau.
+
+---
+
+### Structure minimale
+
+Un fichier `dataprofils.js` minimal peut contenir uniquement :
+
+```js
+window.Profils = [
+  {
+    reference: "RECT40x20",
+    designation: "Rectangle 40 x 20",
+    largeur: 40,
+    hauteur: 20,
+    paths: "M0 0 H40 V20 H0 Z"
+  }
+];
+```

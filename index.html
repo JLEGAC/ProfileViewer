@@ -1,0 +1,2427 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ProfileViewer</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --border: #d6dde5;
+      --text: #17202a;
+      --muted: #6b7785;
+      --accent: #2563eb;
+      --danger: #dc2626;
+      --ok: #16a34a;
+      --annot: #f97316;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 330px 1fr 300px;
+      height: 100vh;
+    }
+
+    aside, .right-panel {
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 14px;
+      overflow: auto;
+    }
+
+    .right-panel {
+      border-right: none;
+      border-left: 1px solid var(--border);
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0 0 12px;
+    }
+
+    h2 {
+      font-size: 14px;
+      margin: 18px 0 8px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    input, button {
+      font: inherit;
+    }
+
+    input {
+      width: 100%;
+      padding: 9px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .btn-row, .tool-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .btn-row { margin-top: 8px; }
+
+    button {
+      border: 1px solid var(--border);
+      background: #fff;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      min-width: 38px;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    button.danger {
+      color: var(--danger);
+    }
+
+    button.active {
+      background: #dbeafe;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .list {
+      margin-top: 10px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .profile-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      cursor: pointer;
+      background: #fff;
+    }
+
+    .profile-item:hover {
+      border-color: var(--accent);
+    }
+
+    .profile-item.selected {
+      border-color: var(--accent);
+      background: #eff6ff;
+    }
+
+    .profile-ref {
+      font-weight: bold;
+    }
+
+    .profile-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    main {
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(0,0,0,.04) 1px, transparent 1px),
+        linear-gradient(rgba(0,0,0,.04) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    #toolbar {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 10;
+      background: rgba(255,255,255,.94);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      box-shadow: 0 6px 20px rgba(0,0,0,.08);
+      max-width: calc(100% - 24px);
+    }
+
+    .tool-separator {
+      width: 1px;
+      background: var(--border);
+      align-self: stretch;
+      margin: 0 2px;
+    }
+
+    .annotation-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 4px 6px;
+      background: #fff7ed;
+    }
+
+    .annotation-label {
+      color: #9a3412;
+      font-size: 12px;
+      font-weight: bold;
+      margin-right: 2px;
+    }
+
+    #workspace {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: default;
+      touch-action: none;
+    }
+
+    #workspace.dragging {
+      cursor: grabbing;
+    }
+
+    #workspace.panning {
+      cursor: grab;
+    }
+
+    #workspace.placing,
+    #workspace.measuring,
+    #workspace.annotating {
+      cursor: crosshair;
+    }
+
+    .profile-shape {
+      stroke-width: .35;
+      vector-effect: non-scaling-stroke;
+      cursor: move;
+    }
+
+    .profile-shape.selected {
+      stroke-width: .9;
+      stroke: var(--accent);
+    }
+
+    .preview-shape {
+      stroke-width: .45;
+      vector-effect: non-scaling-stroke;
+      pointer-events: none;
+      opacity: .55;
+    }
+
+    .measure-line {
+      stroke: var(--danger);
+      stroke-width: 1.1;
+      vector-effect: non-scaling-stroke;
+      fill: none;
+    }
+
+    .measure-extension {
+      stroke: var(--danger);
+      stroke-width: .7;
+      vector-effect: non-scaling-stroke;
+      fill: none;
+      stroke-dasharray: 3 2;
+    }
+
+    .measure-point {
+      fill: var(--danger);
+      stroke: #fff;
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .snap-point {
+      fill: var(--accent);
+      stroke: #fff;
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+      pointer-events: none;
+    }
+
+    .measure-text {
+      fill: var(--danger);
+      font-size: 12px;
+      font-weight: bold;
+      paint-order: stroke;
+      stroke: white;
+      stroke-width: 3px;
+      vector-effect: non-scaling-stroke;
+      cursor: move;
+      user-select: none;
+    }
+
+    .measure-group,
+    .annotation-group {
+      cursor: move;
+    }
+
+    .measure-group.selected .measure-line,
+    .measure-group.selected .measure-extension,
+    .annotation-group.selected .annotation-shape {
+      stroke-width: 1.9;
+    }
+
+    .annotation-shape {
+      stroke: var(--annot);
+      stroke-width: 1.2;
+      vector-effect: non-scaling-stroke;
+      fill: none;
+    }
+
+    .annotation-text {
+      fill: var(--annot);
+      font-size: 13px;
+      font-weight: bold;
+      paint-order: stroke;
+      stroke: white;
+      stroke-width: 3px;
+      vector-effect: non-scaling-stroke;
+      cursor: move;
+      user-select: none;
+    }
+
+    .handle {
+      fill: #fff;
+      stroke: var(--accent);
+      stroke-width: 1.2;
+      vector-effect: non-scaling-stroke;
+      cursor: pointer;
+    }
+
+    .select-rect {
+      fill: rgba(37, 99, 235, .12);
+      stroke: var(--accent);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+      stroke-dasharray: 4 3;
+      pointer-events: none;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 7px 10px;
+      font-size: 13px;
+    }
+
+    .kv div:nth-child(odd) {
+      color: var(--muted);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+      margin-top: 8px;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 14px;
+      color: var(--text);
+      font-weight: 800;
+      letter-spacing: .04em;
+    }
+
+    .brand-title {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .data-import {
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      margin-top: 10px;
+      background: #f8fafc;
+    }
+
+    .data-import.dragover {
+      border-color: var(--accent);
+      background: #eff6ff;
+    }
+
+    .data-import-title {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+
+    .data-import button {
+      margin-top: 8px;
+    }
+
+    .data-status {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="brand" aria-label="ProfileViewer"><div class="brand-title">ProfileViewer</div></div>
+      <input id="search" placeholder="Rechercher une référence..." autocomplete="off" />
+
+      <div class="btn-row">
+        <button id="clearAll" class="danger">Tout vider</button>
+      </div>
+
+      <div id="dataImport" class="data-import">
+        <div class="data-import-title">Données de profils</div>
+        <div class="hint">Déposez votre fichier <b>dataprofils.js</b> ici, ou utilisez le bouton ci-dessous.</div>
+        <button id="loadDataFile" type="button">Choisir un fichier</button>
+        <input id="dataFileInput" type="file" accept=".js,application/javascript,text/javascript,text/plain" hidden />
+        <div id="dataStatus" class="data-status">Chargement des données...</div>
+      </div>
+
+
+      <p class="hint">
+        Chargez vos profils, puis cliquez sur une référence pour préparer son placement dans la zone graphique.
+      </p>
+
+      <h2>Profils</h2>
+      <div id="count" class="small"></div>
+      <div id="profileList" class="list"></div>
+    </aside>
+
+    <main id="viewHost">
+      <div id="toolbar">
+        <div class="tool-group">
+          <button id="measureBtn" title="Mesure">Mesure</button>
+          <button id="rot90" title="Rotation 90° (R)">↻</button>
+          <button id="mirrorH" title="Miroir horizontal (M)">⇋</button>
+          <button id="copyBtn" title="Copier la sélection (Ctrl+C)">⎘ Copier</button>
+          <button id="undoBtn" title="Annuler (Ctrl+Z)">↶</button>
+          <button id="redoBtn" title="Rétablir (Ctrl+Y)">↷</button>
+          <button id="deleteSelected" class="danger" title="Supprimer la sélection">Suppr.</button>
+          <button id="resetView" title="Vue initiale">Vue</button>
+        </div>
+
+        <div class="tool-separator"></div>
+
+        <div class="annotation-box">
+          <span class="annotation-label">Annotations</span>
+          <button id="arrowBtn" title="Flèche">➜</button>
+          <button id="rectBtn" title="Rectangle">▭</button>
+          <button id="circleBtn" title="Cercle">○</button>
+          <button id="textBtn" title="Texte">T</button>
+        </div>
+      </div>
+
+      <svg id="workspace">
+        <defs>
+          <marker id="arrowMarker" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+            <path d="M 0 0 L 8 4 L 0 8 z" fill="#f97316"></path>
+          </marker>
+        </defs>
+        <g id="viewport">
+          <g id="profilesLayer"></g>
+          <g id="previewLayer"></g>
+          <g id="measureLayer"></g>
+          <g id="annotationLayer"></g>
+          <g id="handlesLayer"></g>
+          <g id="snapLayer"></g>
+          <g id="selectionLayer"></g>
+        </g>
+      </svg>
+    </main>
+
+    <section class="right-panel">
+      <h2>Sélection</h2>
+      <div id="selectionInfo" class="hint">Aucun objet sélectionné.</div>
+
+      <h2>Profil prêt à poser</h2>
+      <div id="placementInfo" class="hint">Clique une référence dans la liste.</div>
+
+      <h2>Mesure</h2>
+      <div id="measureInfo" class="hint">
+        Active "Mesure", puis clique deux sommets et un troisième point pour placer la cote.
+      </div>
+
+      <h2>Annotations</h2>
+      <div id="annotationInfo" class="hint">
+        Flèche, rectangle, cercle ou texte. Les annotations peuvent être déplacées, copiées, supprimées et ajustées.
+      </div>
+
+      <h2>Commandes</h2>
+      <div class="hint">
+        <b>Souris</b><br>
+        - Molette : zoom<br>
+        - Molette maintenue : déplacement de la vue<br>
+        - Clic-glisser sur sélection : déplacer<br>
+        - Ctrl/Maj + clic : ajouter/retirer<br>
+        - Clic-glisser vide : fenêtre de sélection<br><br>
+        <b>Clavier</b><br>
+        - Ctrl+Z / Ctrl+Y : annuler/rétablir<br>
+        - Ctrl+C / Ctrl+V : copier/coller<br>
+        - R : rotation 90°<br>
+        - M : miroir<br>
+        - F2 : modifier texte sélectionné<br>
+        - Suppr : supprimer sélection<br>
+        - Échap : annuler mode actif
+      </div>
+    </section>
+  </div>
+<script>
+    // ==============================
+    // Paramètres modifiables
+    // ==============================
+    const MAX_RESULTS = 80;
+    const INITIAL_ZOOM = 4;
+    const SNAP_RADIUS_PX = 12;
+    const SELECT_THRESHOLD_PX = 5;
+    const HANDLE_RADIUS = 2.2;
+    const PROFILE_COLORS = [
+      ["rgba(37,99,235,.22)", "#1d4ed8"],
+      ["rgba(220,38,38,.20)", "#b91c1c"],
+      ["rgba(22,163,74,.20)", "#15803d"],
+      ["rgba(245,158,11,.22)", "#b45309"],
+      ["rgba(147,51,234,.18)", "#7e22ce"],
+      ["rgba(14,165,233,.20)", "#0369a1"]
+    ];
+
+    // ==============================
+    // Etat application
+    // ==============================
+    let profilesData = [];
+    const svg = document.getElementById("workspace");
+    const viewport = document.getElementById("viewport");
+    const profilesLayer = document.getElementById("profilesLayer");
+    const previewLayer = document.getElementById("previewLayer");
+    const measureLayer = document.getElementById("measureLayer");
+    const annotationLayer = document.getElementById("annotationLayer");
+    const handlesLayer = document.getElementById("handlesLayer");
+    const snapLayer = document.getElementById("snapLayer");
+    const selectionLayer = document.getElementById("selectionLayer");
+
+    let selectedData = null;
+    let selection = [];
+    let instances = [];
+    let measures = [];
+    let annotations = [];
+    let instanceId = 1;
+    let measureId = 1;
+    let annotationId = 1;
+
+    let view = { x: 420, y: 300, scale: INITIAL_ZOOM };
+    let drag = null;
+    let clipboard = [];
+
+    let undoStack = [];
+    let redoStack = [];
+    let restoring = false;
+
+    let pendingPlacement = null;
+    let pendingCopy = null;
+    let preview = null;
+    let previewRotation = 0;
+    let previewMirror = 1;
+
+    let measureMode = false;
+    let measureStep = 0;
+    let measureA = null;
+    let measureB = null;
+
+    let annotationMode = null;
+    let annotationStart = null;
+    let tempAnnotation = null;
+
+    let selectionRect = null;
+
+    // ==============================
+    // Initialisation
+    // ==============================
+    updateView();
+    initDataLoading();
+
+    document.getElementById("search").addEventListener("input", e => renderList(e.target.value));
+    document.getElementById("clearAll").addEventListener("click", () => { saveHistory("Tout vider"); clearAll(false); });
+    document.getElementById("measureBtn").addEventListener("click", toggleMeasure);
+    document.getElementById("rot90").addEventListener("click", rotateAction);
+    document.getElementById("mirrorH").addEventListener("click", mirrorAction);
+    document.getElementById("copyBtn").addEventListener("click", copySelectionToClipboard);
+    document.getElementById("undoBtn").addEventListener("click", undo);
+    document.getElementById("redoBtn").addEventListener("click", redo);
+    document.getElementById("deleteSelected").addEventListener("click", deleteSelection);
+    document.getElementById("resetView").addEventListener("click", resetView);
+
+    document.getElementById("arrowBtn").addEventListener("click", () => setAnnotationMode("arrow"));
+    document.getElementById("rectBtn").addEventListener("click", () => setAnnotationMode("rect"));
+    document.getElementById("circleBtn").addEventListener("click", () => setAnnotationMode("circle"));
+    document.getElementById("textBtn").addEventListener("click", () => setAnnotationMode("text"));
+
+    svg.addEventListener("wheel", onWheel, { passive: false });
+    svg.addEventListener("pointerdown", onPointerDown);
+    svg.addEventListener("pointermove", onPointerMove);
+    svg.addEventListener("pointerup", onPointerUp);
+    svg.addEventListener("pointerleave", onPointerUp);
+    svg.addEventListener("dblclick", onDoubleClick);
+
+    window.addEventListener("keydown", onKeyDown);
+
+    // ==============================
+    // Historique
+    // ==============================
+    function serializeState() {
+      return JSON.stringify({
+        instances: instances.map(i => ({
+          kind: "profile", id: i.id, data: i.data, x: i.x, y: i.y, rotation: i.rotation,
+          sx: i.sx, sy: i.sy, fill: i.fill, stroke: i.stroke
+        })),
+        measures: measures.map(m => ({
+          kind: "measure", id: m.id, axis: m.axis, value: m.value, a: m.a, b: m.b,
+          x: m.x, y: m.y, placement: m.placement
+        })),
+        annotations: annotations.map(a => ({
+          kind: "annotation", id: a.id, type: a.type, x: a.x, y: a.y,
+          start: a.start, end: a.end, text: a.text
+        })),
+        ids: { instanceId, measureId, annotationId }
+      });
+    }
+
+    function restoreState(stateJson) {
+      restoring = true;
+      const state = JSON.parse(stateJson);
+
+      profilesLayer.innerHTML = "";
+      measureLayer.innerHTML = "";
+      annotationLayer.innerHTML = "";
+      handlesLayer.innerHTML = "";
+
+      instances = [];
+      measures = [];
+      annotations = [];
+      selection = [];
+
+      for (const p of state.instances || []) {
+        addProfile(p.data, p.x, p.y, p.rotation, p.sx, p.sy, p.fill, p.stroke, p.id, false);
+      }
+
+      for (const m of state.measures || []) {
+        const item = {
+          kind: "measure", id: m.id, axis: m.axis, value: m.value, a: m.a, b: m.b,
+          x: m.x, y: m.y, placement: m.placement
+        };
+        createMeasureElement(item);
+        measures.push(item);
+      }
+
+      for (const a of state.annotations || []) {
+        const item = {
+          kind: "annotation", id: a.id, type: a.type, x: a.x || 0, y: a.y || 0,
+          start: a.start, end: a.end, text: a.text
+        };
+        createAnnotationElement(item);
+        annotations.push(item);
+      }
+
+      instanceId = state.ids?.instanceId || (Math.max(0, ...instances.map(i => i.id)) + 1);
+      measureId = state.ids?.measureId || (Math.max(0, ...measures.map(m => m.id)) + 1);
+      annotationId = state.ids?.annotationId || (Math.max(0, ...annotations.map(a => a.id)) + 1);
+
+      clearSelection();
+      restoring = false;
+    }
+
+    function saveHistory(label) {
+      if (restoring) return;
+      undoStack.push(serializeState());
+      redoStack = [];
+    }
+
+    function undo() {
+      if (!undoStack.length) return;
+      const current = serializeState();
+      const previous = undoStack.pop();
+      redoStack.push(current);
+      restoreState(previous);
+    }
+
+    function redo() {
+      if (!redoStack.length) return;
+      const current = serializeState();
+      const next = redoStack.pop();
+      undoStack.push(current);
+      restoreState(next);
+    }
+
+
+    // ==============================
+    // Chargement des donnees
+    // ==============================
+    function initDataLoading() {
+      const dropZone = document.getElementById("dataImport");
+      const fileInput = document.getElementById("dataFileInput");
+      const loadButton = document.getElementById("loadDataFile");
+
+      loadButton.addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", e => {
+        const file = e.target.files && e.target.files[0];
+        if (file) loadProfilesFromFile(file);
+      });
+
+      dropZone.addEventListener("dragover", e => {
+        e.preventDefault();
+        dropZone.classList.add("dragover");
+      });
+
+      dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("dragover");
+      });
+
+      dropZone.addEventListener("drop", e => {
+        e.preventDefault();
+        dropZone.classList.remove("dragover");
+        const file = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) loadProfilesFromFile(file);
+      });
+
+      loadProfilesFromScript("dataprofils.js", "real")
+        .then(ok => {
+          if (ok) return;
+          return loadProfilesFromScript("sample-dataprofils.js", "sample");
+        })
+        .then(ok => {
+          if (!ok) {
+            setDataStatus("Aucune donnee chargee. Deposez un fichier dataprofils.js.", false);
+            applyProfiles([]);
+          }
+        });
+    }
+
+    function loadProfilesFromScript(src, mode) {
+      return new Promise(resolve => {
+        const previous = window.Profils;
+        window.Profils = undefined;
+
+        const script = document.createElement("script");
+        script.src = src + "?v=" + Date.now();
+        script.async = true;
+
+        script.onload = () => {
+          const profiles = Array.isArray(window.Profils) ? window.Profils : [];
+          if (profiles.length) {
+            applyProfiles(profiles);
+            if (mode === "real") {
+              setDataStatus(`${profiles.length} profil(s) charge(s) depuis dataprofils.js.`, true);
+              hideDataImport();
+            } else {
+              setDataStatus(`Exemple charge : ${profiles.length} profil(s) fictif(s). Deposez votre dataprofils.js pour charger vos donnees.`, false);
+            }
+            resolve(true);
+          } else {
+            window.Profils = previous;
+            resolve(false);
+          }
+        };
+
+        script.onerror = () => {
+          window.Profils = previous;
+          resolve(false);
+        };
+
+        document.head.appendChild(script);
+      });
+    }
+
+    function loadProfilesFromFile(file) {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        try {
+          const sandbox = {};
+          const fn = new Function("window", String(reader.result) + "\nreturn window.Profils;");
+          const profiles = fn(sandbox);
+
+          if (!Array.isArray(profiles) || !profiles.length) {
+            setDataStatus("Fichier lu, mais aucune variable window.Profils valide n'a ete trouvee.", false);
+            return;
+          }
+
+          applyProfiles(profiles);
+          setDataStatus(`${profiles.length} profil(s) charge(s) depuis ${file.name}.`, true);
+          hideDataImport();
+        } catch (error) {
+          setDataStatus("Erreur pendant la lecture du fichier : " + error.message, false);
+        }
+      };
+
+      reader.onerror = () => {
+        setDataStatus("Impossible de lire le fichier selectionne.", false);
+      };
+
+      reader.readAsText(file, "utf-8");
+    }
+
+    function applyProfiles(profiles) {
+      profilesData = profiles;
+      selectedData = null;
+      clearPendingPlacement();
+      clearSelection();
+      renderList(document.getElementById("search").value || "");
+    }
+
+    function setDataStatus(message, success) {
+      const status = document.getElementById("dataStatus");
+      status.textContent = message;
+      status.style.color = success ? "var(--ok)" : "var(--muted)";
+    }
+
+    function hideDataImport() {
+      const box = document.getElementById("dataImport");
+      if (box) box.style.display = "none";
+    }
+
+
+    // ==============================
+    // Liste profils
+    // ==============================
+    function renderList(query) {
+      const q = String(query || "").trim().toLowerCase();
+      const list = document.getElementById("profileList");
+
+      const filtered = profilesData
+        .filter(p =>
+          String(p.reference).toLowerCase().includes(q) ||
+          String(p.designation || "").toLowerCase().includes(q)
+        )
+        .slice(0, MAX_RESULTS);
+
+      document.getElementById("count").textContent =
+        `${filtered.length} affiché(s) / ${profilesData.length} profil(s)`;
+
+      list.innerHTML = "";
+
+      filtered.forEach(p => {
+        const item = document.createElement("div");
+        item.className = "profile-item";
+        item.innerHTML = `
+          <div class="profile-ref">${escapeHtml(p.reference)}</div>
+          <div class="profile-label">${escapeHtml(p.designation || "")}</div>
+        `;
+        item.addEventListener("click", () => {
+          selectedData = p;
+          setPendingPlacement(p);
+          document.querySelectorAll(".profile-item").forEach(el => el.classList.remove("selected"));
+          item.classList.add("selected");
+        });
+        list.appendChild(item);
+      });
+    }
+
+    // ==============================
+    // Sélection
+    // ==============================
+    function setSelection(items) {
+      selection = unique(items).filter(Boolean);
+      syncSelectionVisuals();
+      updateSelectionInfo();
+      drawAnnotationHandles();
+    }
+
+    function toggleSelection(item) {
+      if (selection.includes(item)) {
+        setSelection(selection.filter(x => x !== item));
+      } else {
+        setSelection([...selection, item]);
+      }
+    }
+
+    function clearSelection() {
+      setSelection([]);
+    }
+
+    function syncSelectionVisuals() {
+      document.querySelectorAll(".profile-shape, .measure-group, .annotation-group").forEach(el => el.classList.remove("selected"));
+
+      for (const item of selection) {
+        if (item.kind === "profile" && item.path) item.path.classList.add("selected");
+        if ((item.kind === "measure" || item.kind === "annotation") && item.g) item.g.classList.add("selected");
+      }
+    }
+
+    function updateSelectionInfo() {
+      const el = document.getElementById("selectionInfo");
+
+      if (!selection.length) {
+        el.innerHTML = "Aucun objet sélectionné.";
+        return;
+      }
+
+      if (selection.length > 1) {
+        const countProfiles = selection.filter(x => x.kind === "profile").length;
+        const countMeasures = selection.filter(x => x.kind === "measure").length;
+        const countAnnots = selection.filter(x => x.kind === "annotation").length;
+
+        el.innerHTML = `
+          <div class="kv">
+            <div>Total</div><div><b>${selection.length} objets</b></div>
+            <div>Profils</div><div>${countProfiles}</div>
+            <div>Cotes</div><div>${countMeasures}</div>
+            <div>Annotations</div><div>${countAnnots}</div>
+          </div>
+          <span class="pill">Actions de groupe disponibles</span>
+        `;
+        return;
+      }
+
+      const item = selection[0];
+
+      if (item.kind === "profile") {
+        const p = item.data;
+        el.innerHTML = `
+          <div class="kv">
+            <div>Référence</div><div><b>${escapeHtml(p.reference)}</b></div>
+            <div>Désignation</div><div>${escapeHtml(p.designation || "")}</div>
+            <div>Largeur</div><div>${fmt(p.largeur)} mm</div>
+            <div>Hauteur</div><div>${fmt(p.hauteur)} mm</div>
+            <div>Surface</div><div>${fmt(p.surface)}</div>
+            <div>Poids</div><div>${fmt(p.poids)} kg/m</div>
+            <div>Ix</div><div>${fmt(p.ixx)}</div>
+            <div>Iy</div><div>${fmt(p.iyy)}</div>
+            <div>Rotation</div><div>${item.rotation}°</div>
+            <div>Miroir</div><div>${item.sx < 0 ? "oui" : "non"}</div>
+          </div>
+        `;
+        return;
+      }
+
+      if (item.kind === "measure") {
+        el.innerHTML = `
+          <div class="kv">
+            <div>Sélection</div><div><b>Cote</b></div>
+            <div>Valeur</div><div>${fmt(item.value)} mm</div>
+            <div>Type</div><div>${item.axis === "x" ? "Horizontale" : "Verticale"}</div>
+          </div>
+          <span class="pill">Déplaçable / Supprimable</span>
+        `;
+        return;
+      }
+
+      if (item.kind === "annotation") {
+        el.innerHTML = `
+          <div class="kv">
+            <div>Sélection</div><div><b>Annotation</b></div>
+            <div>Type</div><div>${annotationLabel(item.type)}</div>
+            ${item.type === "text" ? `<div>Texte</div><div>${escapeHtml(item.text || "")}</div>` : ""}
+          </div>
+          <span class="pill">Déplaçable / Supprimable / Ajustable</span>
+        `;
+      }
+    }
+
+    function unique(items) {
+      return [...new Set(items)];
+    }
+
+    // ==============================
+    // Placement et aperçu
+    // ==============================
+    function setPendingPlacement(p) {
+      cancelModeOnly();
+      pendingPlacement = p;
+      pendingCopy = null;
+      previewRotation = 0;
+      previewMirror = 1;
+      createOrUpdateProfilePreview(p);
+      clearSelection();
+
+      document.getElementById("placementInfo").innerHTML = `
+        <div class="kv">
+          <div>Référence</div><div><b>${escapeHtml(p.reference)}</b></div>
+          <div>Désignation</div><div>${escapeHtml(p.designation || "")}</div>
+        </div>
+        <span class="pill">↻ / ⇋ possibles avant pose</span>
+      `;
+
+      svg.classList.add("placing");
+    }
+
+    function createOrUpdateProfilePreview(p) {
+      previewLayer.innerHTML = "";
+
+      const color = PROFILE_COLORS[instances.length % PROFILE_COLORS.length];
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+
+      path.setAttribute("d", p.paths);
+      path.setAttribute("fill", color[0]);
+      path.setAttribute("stroke", color[1]);
+      path.classList.add("preview-shape");
+
+      g.appendChild(path);
+      previewLayer.appendChild(g);
+
+      preview = { type: "profile", data: p, g, x: 0, y: 0, fill: color[0], stroke: color[1] };
+      updatePreviewTransform();
+    }
+
+    function copySelectionToClipboard() {
+      if (!selection.length) return;
+      clipboard = selection.map(cloneItemData);
+      startPasteFromClipboard();
+    }
+
+    function startPasteFromClipboard() {
+      if (!clipboard.length) return;
+
+      cancelModeOnly();
+      pendingPlacement = null;
+      pendingCopy = { items: clipboard.map(cloneClipboardItem) };
+      previewRotation = 0;
+      previewMirror = 1;
+      previewLayer.innerHTML = "";
+
+      const bounds = getRawClipboardBounds(pendingCopy.items);
+      const center = getBoundsCenter(bounds);
+
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      g.dataset.previewCopy = "1";
+
+      for (const copyItem of pendingCopy.items) {
+        g.appendChild(copyItem.g);
+      }
+
+      previewLayer.appendChild(g);
+      preview = { type: "copy", g, x: 0, y: 0, baseCenter: center };
+      updatePreviewTransform();
+
+      document.getElementById("placementInfo").innerHTML = `
+        <div class="kv">
+          <div>Copie</div><div><b>${pendingCopy.items.length} objet(s)</b></div>
+        </div>
+        <span class="pill">↻ / ⇋ possibles avant pose</span>
+      `;
+
+      svg.classList.add("placing");
+    }
+
+    function cloneItemData(item) {
+      if (item.kind === "profile") {
+        return { kind: "profile", data: item.data, x: item.x, y: item.y, rotation: item.rotation, sx: item.sx, sy: item.sy, fill: item.fill, stroke: item.stroke };
+      }
+      if (item.kind === "measure") {
+        return { kind: "measure", axis: item.axis, value: item.value, a: { ...item.a }, b: { ...item.b }, x: item.x, y: item.y, placement: { ...item.placement } };
+      }
+      if (item.kind === "annotation") {
+        return { kind: "annotation", type: item.type, x: item.x, y: item.y, start: item.start ? { ...item.start } : null, end: item.end ? { ...item.end } : null, text: item.text || "" };
+      }
+    }
+
+    function cloneClipboardItem(data) {
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+
+      if (data.kind === "profile") {
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", data.data.paths);
+        path.setAttribute("fill", data.fill);
+        path.setAttribute("stroke", data.stroke);
+        path.classList.add("preview-shape");
+        g.appendChild(path);
+        g.setAttribute("transform", `translate(${data.x} ${data.y}) rotate(${data.rotation}) scale(${data.sx} ${data.sy})`);
+      } else if (data.kind === "measure") {
+        const temp = { ...data, g };
+        redrawMeasureToGroup(temp, g, true);
+        g.setAttribute("transform", `translate(${data.x} ${data.y})`);
+      } else if (data.kind === "annotation") {
+        drawAnnotationPreview(data, g);
+        g.setAttribute("transform", `translate(${data.x || 0} ${data.y || 0})`);
+      }
+
+      return { ...data, g };
+    }
+
+    function drawAnnotationPreview(data, g) {
+      if (data.type === "text") {
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", 0);
+        text.setAttribute("y", 0);
+        text.classList.add("annotation-text");
+        text.textContent = data.text || "";
+        g.appendChild(text);
+      } else {
+        g.appendChild(createAnnotationShape(data.type, data.start, data.end));
+      }
+      g.style.opacity = ".55";
+    }
+
+    function updatePreviewPosition(pt) {
+      if (!preview) return;
+      preview.x = pt.x;
+      preview.y = pt.y;
+      updatePreviewTransform();
+    }
+
+    function updatePreviewTransform() {
+      if (!preview) return;
+
+      if (preview.type === "profile") {
+        preview.g.setAttribute(
+          "transform",
+          `translate(${preview.x} ${preview.y}) rotate(${previewRotation}) scale(${previewMirror} 1)`
+        );
+      }
+
+      if (preview.type === "copy") {
+        const c = preview.baseCenter;
+        const dx = preview.x - c.x;
+        const dy = preview.y - c.y;
+        preview.g.setAttribute(
+          "transform",
+          `translate(${dx} ${dy}) translate(${c.x} ${c.y}) rotate(${previewRotation}) scale(${previewMirror} 1) translate(${-c.x} ${-c.y})`
+        );
+      }
+    }
+
+    function placePendingAt(pt) {
+      saveHistory("Placement");
+
+      if (pendingPlacement) {
+        const placed = addProfile(pendingPlacement, pt.x, pt.y, previewRotation, previewMirror, 1);
+        clearPendingPlacement();
+        setSelection([placed]);
+        return;
+      }
+
+      if (pendingCopy) {
+        const placed = [];
+        const bounds = getRawClipboardBounds(pendingCopy.items);
+        const c = getBoundsCenter(bounds);
+        const dx = pt.x - c.x;
+        const dy = pt.y - c.y;
+
+        for (const data of pendingCopy.items) {
+          const newItem = createItemFromClipboardData(data, dx, dy);
+          if (newItem) placed.push(newItem);
+        }
+
+        const center = { x: c.x + dx, y: c.y + dy };
+        if (previewRotation || previewMirror === -1) {
+          for (const item of placed) applyGroupTransformToItem(item, center.x, center.y, previewRotation, previewMirror);
+        }
+
+        clearPendingPlacement();
+        setSelection(placed);
+      }
+    }
+
+    function createItemFromClipboardData(data, dx, dy) {
+      if (data.kind === "profile") {
+        return addProfile(data.data, data.x + dx, data.y + dy, data.rotation, data.sx, data.sy, data.fill, data.stroke);
+      }
+
+      if (data.kind === "measure") {
+        const item = {
+          kind: "measure",
+          id: measureId++,
+          axis: data.axis,
+          value: data.value,
+          a: { ...data.a },
+          b: { ...data.b },
+          x: data.x + dx,
+          y: data.y + dy,
+          placement: { ...data.placement }
+        };
+        createMeasureElement(item);
+        measures.push(item);
+        return item;
+      }
+
+      if (data.kind === "annotation") {
+        const item = {
+          kind: "annotation",
+          id: annotationId++,
+          type: data.type,
+          x: (data.x || 0) + dx,
+          y: (data.y || 0) + dy,
+          start: data.start ? { ...data.start } : null,
+          end: data.end ? { ...data.end } : null,
+          text: data.text || ""
+        };
+        createAnnotationElement(item);
+        annotations.push(item);
+        return item;
+      }
+      return null;
+    }
+
+    function clearPendingPlacement() {
+      pendingPlacement = null;
+      pendingCopy = null;
+      preview = null;
+      previewRotation = 0;
+      previewMirror = 1;
+      previewLayer.innerHTML = "";
+      svg.classList.remove("placing");
+      document.getElementById("placementInfo").innerHTML = "Clique une référence dans la liste.";
+    }
+
+    // ==============================
+    // Profils
+    // ==============================
+    function addProfile(p, x = 20, y = 20, rotation = 0, sx = 1, sy = 1, fill = null, stroke = null, forcedId = null, updateIds = true) {
+      const color = PROFILE_COLORS[instances.length % PROFILE_COLORS.length];
+      const item = {
+        kind: "profile",
+        id: forcedId || instanceId++,
+        data: p,
+        x,
+        y,
+        rotation,
+        sx,
+        sy,
+        fill: fill || color[0],
+        stroke: stroke || color[1]
+      };
+
+      if (forcedId && updateIds) instanceId = Math.max(instanceId, forcedId + 1);
+
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      g.dataset.id = item.id;
+      g.dataset.kind = "profile";
+
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", p.paths);
+      path.setAttribute("fill", item.fill);
+      path.setAttribute("stroke", item.stroke);
+      path.classList.add("profile-shape");
+
+      g.appendChild(path);
+      profilesLayer.appendChild(g);
+
+      item.g = g;
+      item.path = path;
+      instances.push(item);
+
+      updateProfileTransform(item);
+      return item;
+    }
+
+    function getProfileTransform(item) {
+      return `translate(${item.x} ${item.y}) rotate(${item.rotation}) scale(${item.sx} ${item.sy})`;
+    }
+
+    function updateProfileTransform(item) {
+      item.g.setAttribute("transform", getProfileTransform(item));
+      updateSelectionInfo();
+      drawAnnotationHandles();
+    }
+
+    function rotateAction() {
+      if (pendingPlacement || pendingCopy) {
+        previewRotation = (previewRotation + 90) % 360;
+        updatePreviewTransform();
+        return;
+      }
+
+      if (!selection.length) return;
+      saveHistory("Rotation");
+
+      const center = getBoundsCenter(getItemsBounds(selection));
+      for (const item of selection) applyGroupTransformToItem(item, center.x, center.y, 90, 1);
+      syncSelectionVisuals();
+      drawAnnotationHandles();
+    }
+
+    function mirrorAction() {
+      if (pendingPlacement || pendingCopy) {
+        previewMirror *= -1;
+        updatePreviewTransform();
+        return;
+      }
+
+      if (!selection.length) return;
+      saveHistory("Miroir");
+
+      const center = getBoundsCenter(getItemsBounds(selection));
+      for (const item of selection) applyGroupTransformToItem(item, center.x, center.y, 0, -1);
+      syncSelectionVisuals();
+      drawAnnotationHandles();
+    }
+
+    function applyGroupTransformToItem(item, cx, cy, rotationDeg, mirrorX) {
+      if (item.kind === "profile") {
+        applyGroupTransformToProfile(item, cx, cy, rotationDeg, mirrorX);
+      } else {
+        let px = item.x - cx;
+        let py = item.y - cy;
+
+        if (mirrorX === -1) px = -px;
+
+        const angle = rotationDeg * Math.PI / 180;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+
+        const rx = px * cos - py * sin;
+        const ry = px * sin + py * cos;
+
+        item.x = cx + rx;
+        item.y = cy + ry;
+
+        if (item.start && item.end) {
+          item.start = transformPointAround(item.start, { x: 0, y: 0 }, rotationDeg, mirrorX);
+          item.end = transformPointAround(item.end, { x: 0, y: 0 }, rotationDeg, mirrorX);
+          if (item.kind === "annotation") redrawAnnotation(item);
+        }
+
+        updateItemTransform(item);
+      }
+    }
+
+    function applyGroupTransformToProfile(item, cx, cy, rotationDeg, mirrorX) {
+      let px = item.x - cx;
+      let py = item.y - cy;
+
+      if (mirrorX === -1) {
+        px = -px;
+        item.sx *= -1;
+      }
+
+      const angle = rotationDeg * Math.PI / 180;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+
+      const rx = px * cos - py * sin;
+      const ry = px * sin + py * cos;
+
+      item.x = cx + rx;
+      item.y = cy + ry;
+      item.rotation = (item.rotation + rotationDeg) % 360;
+
+      updateProfileTransform(item);
+    }
+
+    function transformPointAround(p, center, rotationDeg, mirrorX) {
+      let px = p.x - center.x;
+      let py = p.y - center.y;
+      if (mirrorX === -1) px = -px;
+
+      const angle = rotationDeg * Math.PI / 180;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+
+      return {
+        x: center.x + px * cos - py * sin,
+        y: center.y + px * sin + py * cos
+      };
+    }
+
+    // ==============================
+    // Vue / zoom / pan molette
+    // ==============================
+    function updateView() {
+      viewport.setAttribute("transform", `translate(${view.x} ${view.y}) scale(${view.scale})`);
+    }
+
+    function resetView() {
+      view = { x: 420, y: 300, scale: INITIAL_ZOOM };
+      updateView();
+    }
+
+    function onWheel(e) {
+      e.preventDefault();
+
+      const before = screenToWorld(e.clientX, e.clientY);
+      const factor = e.deltaY < 0 ? 1.12 : 0.89;
+      view.scale = clamp(view.scale * factor, 0.4, 80);
+
+      const after = screenToWorld(e.clientX, e.clientY);
+      view.x += (after.x - before.x) * view.scale;
+      view.y += (after.y - before.y) * view.scale;
+
+      updateView();
+    }
+
+    // ==============================
+    // Souris
+    // ==============================
+    function onPointerDown(e) {
+      e.preventDefault();
+
+      if (e.button === 1) {
+        drag = {
+          type: "pan",
+          startScreen: { x: e.clientX, y: e.clientY },
+          startX: view.x,
+          startY: view.y
+        };
+        svg.classList.add("panning");
+        svg.setPointerCapture(e.pointerId);
+        return;
+      }
+
+      if (e.button !== 0) return;
+
+      const pt = screenToWorld(e.clientX, e.clientY);
+
+      if (measureMode) {
+        handleMeasureClick(e);
+        return;
+      }
+
+      if (annotationMode) {
+        handleAnnotationPointerDown(e);
+        return;
+      }
+
+      const handle = e.target.closest("[data-handle]");
+      if (handle) {
+        const item = annotations.find(a => a.id === Number(handle.dataset.itemId));
+        if (item) {
+          saveHistory("Ajustement annotation");
+          drag = {
+            type: "handle",
+            item,
+            handle: handle.dataset.handle,
+            startWorld: pt,
+            original: cloneItemData(item)
+          };
+          svg.setPointerCapture(e.pointerId);
+        }
+        return;
+      }
+
+      const target = findSceneItemFromEvent(e);
+
+      if (pendingPlacement || pendingCopy) {
+        if (!target) placePendingAt(pt);
+        return;
+      }
+
+      if (target) {
+        if (e.ctrlKey || e.shiftKey) {
+          toggleSelection(target);
+        } else if (!selection.includes(target)) {
+          setSelection([target]);
+        }
+
+        const selectedMovable = selection.filter(isMovable);
+        drag = {
+          type: "items",
+          items: selectedMovable,
+          startWorld: pt,
+          moved: false,
+          starts: selectedMovable.map(item => ({ item, x: item.x, y: item.y }))
+        };
+      } else {
+        if (!e.ctrlKey && !e.shiftKey) clearSelection();
+
+        drag = {
+          type: "pendingSelectRect",
+          startWorld: pt,
+          startScreen: { x: e.clientX, y: e.clientY },
+          addMode: e.ctrlKey || e.shiftKey
+        };
+      }
+
+      svg.classList.add("dragging");
+      svg.setPointerCapture(e.pointerId);
+    }
+
+    function onPointerMove(e) {
+      const pt = screenToWorld(e.clientX, e.clientY);
+
+      if (preview && (pendingPlacement || pendingCopy)) {
+        updatePreviewPosition(pt);
+      }
+
+      if (measureMode) {
+        updateSnapPreview(pt);
+      }
+
+      if (annotationMode && annotationStart && tempAnnotation) {
+        updateTempAnnotation(pt);
+      }
+
+      if (!drag) return;
+
+      if (drag.type === "pan") {
+        view.x = drag.startX + (e.clientX - drag.startScreen.x);
+        view.y = drag.startY + (e.clientY - drag.startScreen.y);
+        updateView();
+        return;
+      }
+
+      if (drag.type === "items") {
+        const dx = pt.x - drag.startWorld.x;
+        const dy = pt.y - drag.startWorld.y;
+
+        if (!drag.moved && Math.sqrt(dx * dx + dy * dy) * view.scale > SELECT_THRESHOLD_PX) {
+          drag.moved = true;
+          saveHistory("Déplacement");
+        }
+
+        for (const s of drag.starts) {
+          s.item.x = s.x + dx;
+          s.item.y = s.y + dy;
+          updateItemTransform(s.item);
+        }
+      }
+
+      if (drag.type === "handle") {
+        updateAnnotationHandle(drag.item, drag.handle, pt);
+      }
+
+      if (drag.type === "pendingSelectRect") {
+        const dx = e.clientX - drag.startScreen.x;
+        const dy = e.clientY - drag.startScreen.y;
+        if (Math.sqrt(dx * dx + dy * dy) >= SELECT_THRESHOLD_PX) {
+          startSelectionRect(drag.startWorld, drag.addMode);
+          drag = { type: "selectRect" };
+          updateSelectionRect(pt);
+        }
+      }
+
+      if (drag.type === "selectRect") {
+        updateSelectionRect(pt);
+      }
+    }
+
+    function onPointerUp(e) {
+      if (annotationMode && annotationStart && tempAnnotation) {
+        finishAnnotation(screenToWorld(e.clientX, e.clientY));
+      }
+
+      if (drag && drag.type === "selectRect") {
+        finishSelectionRect(e.ctrlKey || e.shiftKey);
+      }
+
+      drag = null;
+      svg.classList.remove("dragging");
+      svg.classList.remove("panning");
+    }
+
+    function onDoubleClick(e) {
+      const target = findSceneItemFromEvent(e);
+      if (target && target.kind === "annotation" && target.type === "text") {
+        editTextAnnotation(target);
+      }
+    }
+
+    function findSceneItemFromEvent(e) {
+      const profileEl = e.target.closest("[data-kind='profile']");
+      if (profileEl) return instances.find(i => i.id === Number(profileEl.dataset.id));
+
+      const measureEl = e.target.closest("[data-kind='measure']");
+      if (measureEl) return measures.find(m => m.id === Number(measureEl.dataset.id));
+
+      const annotEl = e.target.closest("[data-kind='annotation']");
+      if (annotEl) return annotations.find(a => a.id === Number(annotEl.dataset.id));
+
+      return null;
+    }
+
+    function isMovable(item) {
+      return item.kind === "profile" || item.kind === "measure" || item.kind === "annotation";
+    }
+
+    function updateItemTransform(item) {
+      if (item.kind === "profile") updateProfileTransform(item);
+      else item.g.setAttribute("transform", `translate(${item.x} ${item.y})`);
+      drawAnnotationHandles();
+    }
+
+    // ==============================
+    // Clavier
+    // ==============================
+    function onKeyDown(e) {
+      const tag = (document.activeElement && document.activeElement.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
+
+      if (e.ctrlKey && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        undo();
+        return;
+      }
+
+      if (e.ctrlKey && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+        return;
+      }
+
+      if (e.ctrlKey && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        copySelectionToClipboard();
+        return;
+      }
+
+      if (e.ctrlKey && e.key.toLowerCase() === "v") {
+        e.preventDefault();
+        startPasteFromClipboard();
+        return;
+      }
+
+      if (e.key === "Delete") {
+        e.preventDefault();
+        deleteSelection();
+        return;
+      }
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cancelActiveModes();
+        return;
+      }
+
+      if (e.key.toLowerCase() === "r") {
+        e.preventDefault();
+        rotateAction();
+        return;
+      }
+
+      if (e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        mirrorAction();
+        return;
+      }
+
+      if (e.key === "F2") {
+        const textItem = selection.length === 1 && selection[0].kind === "annotation" && selection[0].type === "text"
+          ? selection[0]
+          : null;
+        if (textItem) {
+          e.preventDefault();
+          editTextAnnotation(textItem);
+        }
+      }
+    }
+
+    // ==============================
+    // Rectangle de sélection
+    // ==============================
+    function startSelectionRect(pt, addMode) {
+      selectionRect = { start: pt, end: pt, addMode };
+      const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      r.classList.add("select-rect");
+      selectionLayer.innerHTML = "";
+      selectionLayer.appendChild(r);
+      selectionRect.el = r;
+      updateSelectionRect(pt);
+    }
+
+    function updateSelectionRect(pt) {
+      if (!selectionRect) return;
+      selectionRect.end = pt;
+
+      const x = Math.min(selectionRect.start.x, selectionRect.end.x);
+      const y = Math.min(selectionRect.start.y, selectionRect.end.y);
+      const w = Math.abs(selectionRect.end.x - selectionRect.start.x);
+      const h = Math.abs(selectionRect.end.y - selectionRect.start.y);
+
+      selectionRect.el.setAttribute("x", x);
+      selectionRect.el.setAttribute("y", y);
+      selectionRect.el.setAttribute("width", w);
+      selectionRect.el.setAttribute("height", h);
+    }
+
+    function finishSelectionRect(addMode) {
+      if (!selectionRect) return;
+
+      const x1 = Math.min(selectionRect.start.x, selectionRect.end.x);
+      const y1 = Math.min(selectionRect.start.y, selectionRect.end.y);
+      const x2 = Math.max(selectionRect.start.x, selectionRect.end.x);
+      const y2 = Math.max(selectionRect.start.y, selectionRect.end.y);
+
+      selectionLayer.innerHTML = "";
+
+      const all = [...instances, ...measures, ...annotations];
+      const found = all.filter(item => {
+        const b = getItemBounds(item);
+        return b && b.x >= x1 && b.y >= y1 && (b.x + b.width) <= x2 && (b.y + b.height) <= y2;
+      });
+
+      setSelection(addMode ? unique([...selection, ...found]) : found);
+      selectionRect = null;
+    }
+
+    // ==============================
+    // Mesure CAO en 3 clics
+    // ==============================
+    function toggleMeasure() {
+      setMeasureMode(!measureMode);
+    }
+
+    function setMeasureMode(enabled) {
+      cancelModeOnly();
+      measureMode = enabled;
+      document.getElementById("measureBtn").classList.toggle("active", measureMode);
+      svg.classList.toggle("measuring", measureMode);
+
+      if (measureMode) {
+        clearPendingPlacement();
+        resetMeasureState();
+        document.getElementById("measureInfo").innerHTML =
+          "Mode mesure actif : clique le premier sommet.";
+      } else {
+        resetMeasureState();
+        document.getElementById("measureInfo").innerHTML =
+          "Active \"Mesure\", puis clique deux sommets et un troisième point pour placer la cote.";
+      }
+    }
+
+    function resetMeasureState() {
+      measureStep = 0;
+      measureA = null;
+      measureB = null;
+      snapLayer.innerHTML = "";
+    }
+
+    function handleMeasureClick(e) {
+      const pt = screenToWorld(e.clientX, e.clientY);
+
+      if (measureStep < 2) {
+        const snap = findNearestVertex(pt);
+        if (!snap) {
+          document.getElementById("measureInfo").innerHTML =
+            "Aucun sommet détecté assez près. Clique plus près d'un sommet.";
+          return;
+        }
+
+        if (measureStep === 0) {
+          measureA = snap;
+          drawSnapPoint(snap);
+          measureStep = 1;
+          document.getElementById("measureInfo").innerHTML =
+            "Premier sommet sélectionné. Clique le second sommet.";
+          return;
+        }
+
+        measureB = snap;
+        drawSnapPoint(snap);
+        measureStep = 2;
+        document.getElementById("measureInfo").innerHTML =
+          "Second sommet sélectionné. Clique pour placer la cote horizontalement ou verticalement.";
+        return;
+      }
+
+      saveHistory("Création cote");
+      const axis = chooseMeasureAxis(measureA, measureB, pt);
+      const measure = createCadMeasure(measureA, measureB, pt, axis);
+      setSelection([measure]);
+      resetMeasureState();
+      document.getElementById("measureInfo").innerHTML =
+        "Cote créée. Clique un nouveau premier sommet pour une autre cote.";
+    }
+
+    function chooseMeasureAxis(a, b, placement) {
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const dx = Math.abs(placement.x - mid.x);
+      const dy = Math.abs(placement.y - mid.y);
+      return dy >= dx ? "x" : "y";
+    }
+
+    function createCadMeasure(a, b, placement, axis) {
+      const item = {
+        kind: "measure",
+        id: measureId++,
+        axis,
+        value: axis === "x" ? Math.abs(b.x - a.x) : Math.abs(b.y - a.y),
+        a: { ...a },
+        b: { ...b },
+        x: 0,
+        y: 0,
+        placement: { ...placement }
+      };
+
+      createMeasureElement(item);
+      measures.push(item);
+      return item;
+    }
+
+    function createMeasureElement(item) {
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      g.classList.add("measure-group");
+      g.dataset.id = item.id;
+      g.dataset.kind = "measure";
+      item.g = g;
+      measureLayer.appendChild(g);
+      redrawMeasure(item);
+    }
+
+    function redrawMeasure(item) {
+      redrawMeasureToGroup(item, item.g, false);
+    }
+
+    function redrawMeasureToGroup(item, g, previewMode) {
+      g.innerHTML = "";
+
+      const a = item.a;
+      const b = item.b;
+      const axis = item.axis;
+      const placement = item.placement;
+
+      let mainLine, ext1, ext2, textX, textY;
+
+      if (axis === "x") {
+        const y = placement.y;
+        mainLine = lineEl(a.x, y, b.x, y, "measure-line");
+        ext1 = lineEl(a.x, a.y, a.x, y, "measure-extension");
+        ext2 = lineEl(b.x, b.y, b.x, y, "measure-extension");
+        textX = (a.x + b.x) / 2;
+        textY = y - 2;
+      } else {
+        const x = placement.x;
+        mainLine = lineEl(x, a.y, x, b.y, "measure-line");
+        ext1 = lineEl(a.x, a.y, x, a.y, "measure-extension");
+        ext2 = lineEl(b.x, b.y, x, b.y, "measure-extension");
+        textX = x + 2;
+        textY = (a.y + b.y) / 2;
+      }
+
+      const p1 = circleEl(a.x, a.y, 1.1, "measure-point");
+      const p2 = circleEl(b.x, b.y, 1.1, "measure-point");
+
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", textX);
+      text.setAttribute("y", textY);
+      text.setAttribute("text-anchor", axis === "x" ? "middle" : "start");
+      text.classList.add("measure-text");
+      text.textContent = `${fmt(item.value)} mm`;
+
+      g.appendChild(ext1);
+      g.appendChild(ext2);
+      g.appendChild(mainLine);
+      g.appendChild(p1);
+      g.appendChild(p2);
+      g.appendChild(text);
+      if (!previewMode) g.setAttribute("transform", `translate(${item.x} ${item.y})`);
+      if (previewMode) g.style.opacity = ".55";
+    }
+
+    function updateSnapPreview(pt) {
+      snapLayer.innerHTML = "";
+      if (measureStep >= 2) return;
+      const snap = findNearestVertex(pt);
+      if (snap) drawSnapPoint(snap);
+    }
+
+    function drawSnapPoint(pt) {
+      const c = circleEl(pt.x, pt.y, 1.5, "snap-point");
+      snapLayer.appendChild(c);
+    }
+
+    function findNearestVertex(pt) {
+      let best = null;
+      let bestDistPx = Infinity;
+
+      for (const item of instances) {
+        const vertices = getPathVertices(item);
+        for (const v of vertices) {
+          const dx = v.x - pt.x;
+          const dy = v.y - pt.y;
+          const distPx = Math.sqrt(dx * dx + dy * dy) * view.scale;
+
+          if (distPx < bestDistPx && distPx <= SNAP_RADIUS_PX) {
+            bestDistPx = distPx;
+            best = v;
+          }
+        }
+      }
+
+      return best;
+    }
+
+    function getPathVertices(item) {
+      const d = item.data.paths || "";
+      const tokens = d.match(/[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+)(?:e[-+]?\d+)?/g) || [];
+      const vertices = [];
+      let i = 0;
+      let cmd = "";
+      let current = { x: 0, y: 0 };
+      let start = { x: 0, y: 0 };
+
+      while (i < tokens.length) {
+        if (isCommand(tokens[i])) cmd = tokens[i++];
+
+        const c = cmd.toUpperCase();
+        const relative = cmd !== c;
+
+        if (c === "M" || c === "L") {
+          if (i + 1 >= tokens.length) break;
+          const x = Number(tokens[i++]);
+          const y = Number(tokens[i++]);
+          current = relative ? { x: current.x + x, y: current.y + y } : { x, y };
+          if (c === "M") start = { ...current };
+          vertices.push(transformLocalPoint(item, current));
+          if (c === "M") cmd = relative ? "l" : "L";
+          continue;
+        }
+
+        if (c === "H") {
+          if (i >= tokens.length) break;
+          const x = Number(tokens[i++]);
+          current = relative ? { x: current.x + x, y: current.y } : { x, y: current.y };
+          vertices.push(transformLocalPoint(item, current));
+          continue;
+        }
+
+        if (c === "V") {
+          if (i >= tokens.length) break;
+          const y = Number(tokens[i++]);
+          current = relative ? { x: current.x, y: current.y + y } : { x: current.x, y };
+          vertices.push(transformLocalPoint(item, current));
+          continue;
+        }
+
+        if (c === "A") {
+          if (i + 6 >= tokens.length) break;
+          i += 5;
+          const x = Number(tokens[i++]);
+          const y = Number(tokens[i++]);
+          current = relative ? { x: current.x + x, y: current.y + y } : { x, y };
+          vertices.push(transformLocalPoint(item, current));
+          continue;
+        }
+
+        if (c === "Z") {
+          current = { ...start };
+          vertices.push(transformLocalPoint(item, current));
+          continue;
+        }
+
+        break;
+      }
+
+      return vertices;
+    }
+
+    function transformLocalPoint(item, p) {
+      const sx = p.x * item.sx;
+      const sy = p.y * item.sy;
+      const angle = item.rotation * Math.PI / 180;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+
+      return {
+        x: item.x + sx * cos - sy * sin,
+        y: item.y + sx * sin + sy * cos
+      };
+    }
+
+    // ==============================
+    // Annotations
+    // ==============================
+    function setAnnotationMode(type) {
+      cancelModeOnly();
+      clearPendingPlacement();
+
+      annotationMode = type;
+      annotationStart = null;
+      tempAnnotation = null;
+      svg.classList.add("annotating");
+
+      document.querySelectorAll("#arrowBtn,#rectBtn,#circleBtn,#textBtn").forEach(btn => btn.classList.remove("active"));
+      const btnId = { arrow: "arrowBtn", rect: "rectBtn", circle: "circleBtn", text: "textBtn" }[type];
+      document.getElementById(btnId).classList.add("active");
+
+      document.getElementById("annotationInfo").innerHTML =
+        type === "text"
+          ? "Clique dans la vue pour créer un texte."
+          : "Clique-glisse dans la vue pour créer l'annotation.";
+    }
+
+    function handleAnnotationPointerDown(e) {
+      const pt = screenToWorld(e.clientX, e.clientY);
+
+      if (annotationMode === "text") {
+        const text = prompt("Texte de l'annotation :");
+        if (text && text.trim()) {
+          saveHistory("Création texte");
+          const item = createTextAnnotation(pt, text.trim());
+          setSelection([item]);
+        }
+        clearAnnotationMode();
+        return;
+      }
+
+      annotationStart = pt;
+      tempAnnotation = createTempAnnotation(annotationMode, pt, pt);
+    }
+
+    function updateTempAnnotation(pt) {
+      if (!tempAnnotation) return;
+      redrawTempAnnotation(tempAnnotation, annotationStart, pt);
+    }
+
+    function finishAnnotation(end) {
+      if (!annotationStart || !tempAnnotation) return;
+
+      const dx = end.x - annotationStart.x;
+      const dy = end.y - annotationStart.y;
+
+      tempAnnotation.g.remove();
+      tempAnnotation = null;
+
+      if (Math.sqrt(dx * dx + dy * dy) < 1) {
+        clearAnnotationMode();
+        return;
+      }
+
+      saveHistory("Création annotation");
+      let item = null;
+      if (annotationMode === "arrow") item = createArrowAnnotation(annotationStart, end);
+      if (annotationMode === "rect") item = createRectAnnotation(annotationStart, end);
+      if (annotationMode === "circle") item = createCircleAnnotation(annotationStart, end);
+
+      if (item) setSelection([item]);
+      clearAnnotationMode();
+    }
+
+    function clearAnnotationMode() {
+      annotationMode = null;
+      annotationStart = null;
+      tempAnnotation = null;
+      svg.classList.remove("annotating");
+      document.querySelectorAll("#arrowBtn,#rectBtn,#circleBtn,#textBtn").forEach(btn => btn.classList.remove("active"));
+      document.getElementById("annotationInfo").innerHTML =
+        "Flèche, rectangle, cercle ou texte. Les annotations peuvent être déplacées, copiées, supprimées et ajustées.";
+    }
+
+    function createTempAnnotation(type, start, end) {
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      annotationLayer.appendChild(g);
+      const item = { type, g };
+      redrawTempAnnotation(item, start, end);
+      return item;
+    }
+
+    function redrawTempAnnotation(item, start, end) {
+      item.g.innerHTML = "";
+      const el = createAnnotationShape(item.type, start, end);
+      if (el) item.g.appendChild(el);
+    }
+
+    function createArrowAnnotation(start, end) {
+      const item = baseAnnotation("arrow");
+      item.start = { ...start };
+      item.end = { ...end };
+      redrawAnnotation(item);
+      return item;
+    }
+
+    function createRectAnnotation(start, end) {
+      const item = baseAnnotation("rect");
+      item.start = { ...start };
+      item.end = { ...end };
+      redrawAnnotation(item);
+      return item;
+    }
+
+    function createCircleAnnotation(start, end) {
+      const item = baseAnnotation("circle");
+      item.start = { ...start };
+      item.end = { ...end };
+      redrawAnnotation(item);
+      return item;
+    }
+
+    function createTextAnnotation(pt, text) {
+      const item = baseAnnotation("text");
+      item.text = text;
+      item.x = pt.x;
+      item.y = pt.y;
+      redrawAnnotation(item);
+      updateItemTransform(item);
+      return item;
+    }
+
+    function baseAnnotation(type) {
+      const item = {
+        kind: "annotation",
+        id: annotationId++,
+        type,
+        x: 0,
+        y: 0
+      };
+
+      createAnnotationElement(item);
+      annotations.push(item);
+      return item;
+    }
+
+    function createAnnotationElement(item) {
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      g.classList.add("annotation-group");
+      g.dataset.id = item.id;
+      g.dataset.kind = "annotation";
+      item.g = g;
+      annotationLayer.appendChild(g);
+      redrawAnnotation(item);
+      updateItemTransform(item);
+    }
+
+    function redrawAnnotation(item) {
+      if (!item.g) return;
+      item.g.innerHTML = "";
+
+      if (item.type === "text") {
+        const el = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        el.setAttribute("x", 0);
+        el.setAttribute("y", 0);
+        el.classList.add("annotation-text");
+        el.textContent = item.text || "";
+        item.g.appendChild(el);
+      } else {
+        item.g.appendChild(createAnnotationShape(item.type, item.start, item.end));
+      }
+
+      updateItemTransform(item);
+    }
+
+    function createAnnotationShape(type, start, end) {
+      if (!start || !end) return document.createElementNS("http://www.w3.org/2000/svg", "g");
+
+      if (type === "arrow") {
+        const line = lineEl(start.x, start.y, end.x, end.y, "annotation-shape");
+        line.setAttribute("marker-end", "url(#arrowMarker)");
+        return line;
+      }
+
+      if (type === "rect") {
+        const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        r.setAttribute("x", Math.min(start.x, end.x));
+        r.setAttribute("y", Math.min(start.y, end.y));
+        r.setAttribute("width", Math.abs(end.x - start.x));
+        r.setAttribute("height", Math.abs(end.y - start.y));
+        r.classList.add("annotation-shape");
+        return r;
+      }
+
+      if (type === "circle") {
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+        c.setAttribute("cx", (start.x + end.x) / 2);
+        c.setAttribute("cy", (start.y + end.y) / 2);
+        c.setAttribute("rx", Math.abs(end.x - start.x) / 2);
+        c.setAttribute("ry", Math.abs(end.y - start.y) / 2);
+        c.classList.add("annotation-shape");
+        return c;
+      }
+
+      return null;
+    }
+
+    function drawAnnotationHandles() {
+      handlesLayer.innerHTML = "";
+      const selectedAnnotations = selection.filter(x => x.kind === "annotation");
+      if (!selectedAnnotations.length) return;
+
+      for (const item of selectedAnnotations) {
+        if (item.type === "arrow") {
+          addHandle(item, "start", item.x + item.start.x, item.y + item.start.y);
+          addHandle(item, "end", item.x + item.end.x, item.y + item.end.y);
+        }
+
+        if (item.type === "rect" || item.type === "circle") {
+          const x1 = item.x + Math.min(item.start.x, item.end.x);
+          const y1 = item.y + Math.min(item.start.y, item.end.y);
+          const x2 = item.x + Math.max(item.start.x, item.end.x);
+          const y2 = item.y + Math.max(item.start.y, item.end.y);
+          addHandle(item, "nw", x1, y1);
+          addHandle(item, "ne", x2, y1);
+          addHandle(item, "sw", x1, y2);
+          addHandle(item, "se", x2, y2);
+        }
+      }
+    }
+
+    function addHandle(item, handle, x, y) {
+      const c = circleEl(x, y, HANDLE_RADIUS, "handle");
+      c.dataset.handle = handle;
+      c.dataset.itemId = item.id;
+      handlesLayer.appendChild(c);
+    }
+
+    function updateAnnotationHandle(item, handle, worldPt) {
+      const local = { x: worldPt.x - item.x, y: worldPt.y - item.y };
+
+      if (item.type === "arrow") {
+        if (handle === "start") item.start = local;
+        if (handle === "end") item.end = local;
+      }
+
+      if (item.type === "rect" || item.type === "circle") {
+        let x1 = Math.min(item.start.x, item.end.x);
+        let y1 = Math.min(item.start.y, item.end.y);
+        let x2 = Math.max(item.start.x, item.end.x);
+        let y2 = Math.max(item.start.y, item.end.y);
+
+        if (handle.includes("n")) y1 = local.y;
+        if (handle.includes("s")) y2 = local.y;
+        if (handle.includes("w")) x1 = local.x;
+        if (handle.includes("e")) x2 = local.x;
+
+        item.start = { x: x1, y: y1 };
+        item.end = { x: x2, y: y2 };
+      }
+
+      redrawAnnotation(item);
+      drawAnnotationHandles();
+    }
+
+    function editTextAnnotation(item) {
+      const next = prompt("Modifier le texte :", item.text || "");
+      if (next === null) return;
+      saveHistory("Modification texte");
+      item.text = next;
+      redrawAnnotation(item);
+      updateSelectionInfo();
+    }
+
+    function annotationLabel(type) {
+      return { arrow: "Flèche", rect: "Rectangle", circle: "Cercle", text: "Texte" }[type] || type;
+    }
+
+    // ==============================
+    // Suppression / nettoyage
+    // ==============================
+    function deleteSelection() {
+      if (!selection.length) return;
+      saveHistory("Suppression");
+
+      for (const item of selection) {
+        if (item.g) item.g.remove();
+        if (item.kind === "profile") instances = instances.filter(x => x !== item);
+        if (item.kind === "measure") measures = measures.filter(x => x !== item);
+        if (item.kind === "annotation") annotations = annotations.filter(x => x !== item);
+      }
+
+      clearSelection();
+    }
+
+    function clearAll(save = true) {
+      if (save) saveHistory("Tout vider");
+
+      profilesLayer.innerHTML = "";
+      previewLayer.innerHTML = "";
+      measureLayer.innerHTML = "";
+      annotationLayer.innerHTML = "";
+      handlesLayer.innerHTML = "";
+      snapLayer.innerHTML = "";
+      selectionLayer.innerHTML = "";
+
+      instances = [];
+      measures = [];
+      annotations = [];
+      selection = [];
+
+      clearPendingPlacement();
+      resetMeasureState();
+      clearAnnotationMode();
+
+      updateSelectionInfo();
+    }
+
+    function cancelActiveModes() {
+      clearPendingPlacement();
+      setMeasureMode(false);
+      clearAnnotationMode();
+      selectionLayer.innerHTML = "";
+      selectionRect = null;
+      drag = null;
+    }
+
+    function cancelModeOnly() {
+      measureMode = false;
+      resetMeasureState();
+      document.getElementById("measureBtn").classList.remove("active");
+      svg.classList.remove("measuring");
+      clearAnnotationMode();
+    }
+
+    // ==============================
+    // Géométrie / bounds
+    // ==============================
+    function getItemsBounds(items) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+      for (const item of items) {
+        const b = getItemBounds(item);
+        if (!b) continue;
+        minX = Math.min(minX, b.x);
+        minY = Math.min(minY, b.y);
+        maxX = Math.max(maxX, b.x + b.width);
+        maxY = Math.max(maxY, b.y + b.height);
+      }
+
+      if (!Number.isFinite(minX)) return null;
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    }
+
+    function getBoundsCenter(b) {
+      if (!b) return { x: 0, y: 0 };
+      return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+    }
+
+    function getItemBounds(item) {
+      if (!item || !item.g) return null;
+      try {
+        const b = item.g.getBBox();
+        const transform = item.g.transform.baseVal.consolidate();
+        const matrix = transform ? transform.matrix : null;
+
+        const points = [
+          { x: b.x, y: b.y },
+          { x: b.x + b.width, y: b.y },
+          { x: b.x, y: b.y + b.height },
+          { x: b.x + b.width, y: b.y + b.height }
+        ].map(p => matrix ? applyMatrix(p, matrix) : p);
+
+        const xs = points.map(p => p.x);
+        const ys = points.map(p => p.y);
+
+        return {
+          x: Math.min(...xs),
+          y: Math.min(...ys),
+          width: Math.max(...xs) - Math.min(...xs),
+          height: Math.max(...ys) - Math.min(...ys)
+        };
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function getRawClipboardBounds(items) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+      for (const item of items) {
+        const b = getRawItemBounds(item);
+        if (!b) continue;
+        minX = Math.min(minX, b.x);
+        minY = Math.min(minY, b.y);
+        maxX = Math.max(maxX, b.x + b.width);
+        maxY = Math.max(maxY, b.y + b.height);
+      }
+
+      if (!Number.isFinite(minX)) return { x: 0, y: 0, width: 1, height: 1 };
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    }
+
+    function getRawItemBounds(item) {
+      if (item.kind === "profile") {
+        return { x: item.x, y: item.y, width: Number(item.data.largeur) || 1, height: Number(item.data.hauteur) || 1 };
+      }
+
+      if (item.kind === "measure") {
+        const xs = [item.a.x, item.b.x, item.placement.x].map(v => v + item.x);
+        const ys = [item.a.y, item.b.y, item.placement.y].map(v => v + item.y);
+        return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+      }
+
+      if (item.kind === "annotation") {
+        if (item.type === "text") return { x: item.x, y: item.y, width: 20, height: 8 };
+        const xs = [item.start.x, item.end.x].map(v => v + item.x);
+        const ys = [item.start.y, item.end.y].map(v => v + item.y);
+        return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+      }
+    }
+
+    function applyMatrix(p, m) {
+      return {
+        x: m.a * p.x + m.c * p.y + m.e,
+        y: m.b * p.x + m.d * p.y + m.f
+      };
+    }
+
+    // ==============================
+    // Outils
+    // ==============================
+    function screenToWorld(clientX, clientY) {
+      const rect = svg.getBoundingClientRect();
+      return {
+        x: (clientX - rect.left - view.x) / view.scale,
+        y: (clientY - rect.top - view.y) / view.scale
+      };
+    }
+
+    function lineEl(x1, y1, x2, y2, cls) {
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", x1);
+      line.setAttribute("y1", y1);
+      line.setAttribute("x2", x2);
+      line.setAttribute("y2", y2);
+      line.classList.add(cls);
+      return line;
+    }
+
+    function circleEl(cx, cy, r, cls) {
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("cx", cx);
+      c.setAttribute("cy", cy);
+      c.setAttribute("r", r);
+      c.classList.add(cls);
+      return c;
+    }
+
+    function isCommand(token) {
+      return /^[a-zA-Z]$/.test(token);
+    }
+
+    function clamp(v, min, max) {
+      return Math.min(max, Math.max(min, v));
+    }
+
+    function fmt(value) {
+      if (value === undefined || value === null || Number.isNaN(Number(value))) return "-";
+      return Number(value).toLocaleString("fr-FR", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 3
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+  </script>
+</body>
+</html>

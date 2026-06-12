@@ -1310,21 +1310,30 @@
       drawAnnotationHandles();
     }
 
-    function mirrorAction() {
-      if (pendingPlacement || pendingCopy) {
-        previewMirror *= -1;
-        updatePreviewTransform();
-        return;
-      }
+function mirrorAction() {
+  if (pendingPlacement || pendingCopy) {
+    previewMirror *= -1;
+    updatePreviewTransform();
+    return;
+  }
 
-      if (!selection.length) return;
-      saveHistory("Miroir");
+  if (!selection.length) return;
+  saveHistory("Miroir");
 
-      const center = getBoundsCenter(getItemsBounds(selection));
-      for (const item of selection) applyGroupTransformToItem(item, center.x, center.y, 0, -1);
-      syncSelectionVisuals();
-      drawAnnotationHandles();
-    }
+  if (selection.length === 1 && selection[0].kind === "profile") {
+    const item = selection[0];
+    item.sx *= -1;
+    updateProfileTransform(item);
+    syncSelectionVisuals();
+    drawAnnotationHandles();
+    return;
+  }
+
+  const center = getBoundsCenter(getItemsBounds(selection));
+  for (const item of selection) applyGroupTransformToItem(item, center.x, center.y, 0, -1);
+  syncSelectionVisuals();
+  drawAnnotationHandles();
+}
 
     function applyGroupTransformToItem(item, cx, cy, rotationDeg, mirrorX) {
       if (item.kind === "profile") {

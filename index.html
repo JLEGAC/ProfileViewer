@@ -608,7 +608,9 @@
     document.getElementById("search").addEventListener("input", e => renderList(e.target.value));
     document.getElementById("clearAll").addEventListener("click", () => { saveHistory("Tout vider"); clearAll(false); });
     document.getElementById("measureBtn").addEventListener("click", toggleMeasure);
-    document.getElementById("rot90").addEventListener("click", rotateAction);
+    const rotationStepInput = document.getElementById("rotationStep");
+    rotationStepInput.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); rotationStepInput.blur(); } });
+    document.getElementById("rot90").addEventListener("click", () => { rotationStepInput.blur(); rotateAction(); });
     document.getElementById("mirrorH").addEventListener("click", mirrorAction);
     document.getElementById("copyBtn").addEventListener("click", copySelectionToClipboard);
     document.getElementById("undoBtn").addEventListener("click", undo);

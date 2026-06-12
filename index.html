@@ -1311,32 +1311,33 @@
     }
 
     function mirrorAction() {
-      if (pendingPlacement || pendingCopy) {
-        previewMirror *= -1;
-        updatePreviewTransform();
-        return;
-      }
+  if (pendingPlacement || pendingCopy) {
+    previewMirror *= -1;
+    updatePreviewTransform();
+    return;
+  }
 
-      if (!selection.length) return;
-      saveHistory("Miroir");
+  if (!selection.length) return;
+  saveHistory("Miroir");
 
-      const onlyProfiles = selection.every(item => item.kind === "profile");
+  const onlyProfiles = selection.every(item => item.kind === "profile");
 
-      if (onlyProfiles) {
-        for (const item of selection) {
-          item.sy *= -1;
-          updateProfileTransform(item);
-        }
-        syncSelectionVisuals();
-        drawAnnotationHandles();
-        return;
-      }
-
-      const center = getBoundsCenter(getItemsBounds(selection));
-      for (const item of selection) applyGroupTransformToItem(item, center.x, center.y, 0, -1);
-      syncSelectionVisuals();
-      drawAnnotationHandles();
+  if (onlyProfiles) {
+    for (const item of selection) {
+      item.sx *= -1;
+      item.rotation = normalizeRotation(180 - item.rotation);
+      updateProfileTransform(item);
     }
+    syncSelectionVisuals();
+    drawAnnotationHandles();
+    return;
+  }
+
+  const center = getBoundsCenter(getItemsBounds(selection));
+  for (const item of selection) applyGroupTransformToItem(item, center.x, center.y, 0, -1);
+  syncSelectionVisuals();
+  drawAnnotationHandles();
+}
 
     function applyGroupTransformToItem(item, cx, cy, rotationDeg, mirrorX) {
       if (item.kind === "profile") {

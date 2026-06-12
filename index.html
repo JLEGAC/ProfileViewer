@@ -176,6 +176,29 @@
       margin: 0 2px;
     }
 
+    .rotation-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 4px 6px;
+      background: #f8fafc;
+    }
+
+    .rotation-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: bold;
+      margin-right: 2px;
+    }
+
+    #rotationStep {
+      width: 72px;
+      padding: 7px 8px;
+      text-align: right;
+    }
+
     .annotation-box {
       display: flex;
       align-items: center;
@@ -432,7 +455,11 @@
       <div id="toolbar">
         <div class="tool-group">
           <button id="measureBtn" title="Mesure">Mesure</button>
-          <button id="rot90" title="Rotation 90° (R)">↻</button>
+          <div class="rotation-box" title="Angle de rotation en degrés">
+            <span class="rotation-label">Rotation</span>
+            <input id="rotationStep" type="number" value="90" step="1" />
+            <button id="rot90" title="Rotation selon l'angle choisi (R)">↻</button>
+          </div>
           <button id="mirrorH" title="Miroir horizontal (M)">⇋</button>
           <button id="copyBtn" title="Copier la sélection (Ctrl+C)">⎘ Copier</button>
           <button id="undoBtn" title="Annuler (Ctrl+Z)">↶</button>
@@ -498,7 +525,7 @@
         <b>Clavier</b><br>
         - Ctrl+Z / Ctrl+Y : annuler/rétablir<br>
         - Ctrl+C / Ctrl+V : copier/coller<br>
-        - R : rotation 90°<br>
+        - R : rotation selon l'angle choisi<br>
         - M : miroir<br>
         - F2 : modifier texte sélectionné<br>
         - Suppr : supprimer sélection<br>
@@ -924,7 +951,7 @@
             <div>Poids</div><div>${fmt(p.poids)} kg/m</div>
             <div>Ix</div><div>${fmt(p.ixx)}</div>
             <div>Iy</div><div>${fmt(p.iyy)}</div>
-            <div>Rotation</div><div>${item.rotation}°</div>
+            <div>Rotation</div><div>${fmt(item.rotation)}°</div>
             <div>Miroir</div><div>${item.sx < 0 ? "oui" : "non"}</div>
           </div>
         `;
@@ -1252,18 +1279,31 @@
       drawAnnotationHandles();
     }
 
+    function getRotationStep() {
+      const input = document.getElementById("rotationStep");
+      const value = Number(input?.value);
+      return Number.isFinite(value) && value !== 0 ? value : 90;
+    }
+
+    function normalizeRotation(rotationDeg) {
+      const normalized = rotationDeg % 360;
+      return normalized < 0 ? normalized + 360 : normalized;
+    }
+
     function rotateAction() {
+      const rotationStep = getRotationStep();
+
       if (pendingPlacement || pendingCopy) {
-        previewRotation = (previewRotation + 90) % 360;
+        previewRotation = normalizeRotation(previewRotation + rotationStep);
         updatePreviewTransform();
         return;
       }
 
       if (!selection.length) return;
-      saveHistory("Rotation");
+      saveHistory(`Rotation ${rotationStep}°`);
 
       const center = getBoundsCenter(getItemsBounds(selection));
-      for (const item of selection) applyGroupTransformToItem(item, center.x, center.y, 90, 1);
+      for (const item of selection) applyGroupTransformToItem(item, center.x, center.y, rotationStep, 1);
       syncSelectionVisuals();
       drawAnnotationHandles();
     }
@@ -1331,7 +1371,7 @@
 
       item.x = cx + rx;
       item.y = cy + ry;
-      item.rotation = (item.rotation + rotationDeg) % 360;
+      item.rotation = normalizeRotation(item.rotation + rotationDeg);
 
       updateProfileTransform(item);
     }
